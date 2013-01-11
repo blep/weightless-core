@@ -28,19 +28,28 @@
 # 
 ## end license ##
 
-import gc
 from sys import exc_info
 from traceback import format_tb
 from inspect import isframe, getframeinfo
 from types import GeneratorType
 from functools import partial
 from weightless.core import compose, Yield, Observable, Transparent, be, tostring, NoneOfTheObserversRespond, DeclineMessage
-from weightless.core._observable import AllMessage, AnyMessage, DoMessage, OnceMessage
+from weightless.core import AllMessage, AnyMessage, DoMessage, OnceMessage
 from unittest import TestCase
 from seecr.test import CallTrace
 
+from gctestcase import GCTestCase
 
-class ObservableTest(TestCase):
+class ObservableCTest(GCTestCase):
+    def testCreateObservable(self):
+        pass
+        #from weightless.core.observable._observable_c import Observable as ObservableC
+        #observable = ObservableC()
+        #x = object()
+        #observable.addObserver(x)
+        #self.assertEquals('?', observable.observers())
+
+class ObservableTest(GCTestCase):
     def testAllWithoutImplementers(self):
         observable = Observable()
         responses = observable.all.someMethodNobodyIsListeningTo()
@@ -188,26 +197,19 @@ class ObservableTest(TestCase):
             self.assertTrue("> returned '1'" in str(e), str(e))
 
     def testOnceAssertsRecursivenessGivesNoReturnValue(self):
-        # This will normally never happen.
+        '''This basically tests if _callonce does not return anything....'''
         class AnObservable(Observable):
             def g(self):
-                raise StopIteration(1)
+                return
                 yield
-        class MockedOnceMessageSelf(OnceMessage):
-            pass
-        def retvalGen(*args, **kwargs):
-            raise StopIteration(1)
-            yield
-        oncedObservable = AnObservable()
-        mockedSelf = MockedOnceMessageSelf(defer=oncedObservable.once, message='noRelevantMethodHere')
-        mockedSelf._callonce = retvalGen
-
-        composed = compose(OnceMessage._callonce(mockedSelf, observers=[AnObservable()], args=(), kwargs={}, done=set()))
+        root = Observable()
+        o = AnObservable()
+        root.addObserver(o)
+        composed = compose(root.once.g())
         try:
             composed.next()
-            self.fail("Should not happen")
-        except AssertionError, e:
-            self.assertEquals("OnceMessage of AnObservable(name=None) returned '1', but must always be None", str(e))
+        except StopIteration, e:
+            self.assertEquals((), e.args)
 
     def testAnyOrCallCallsFirstImplementer(self):
         class A(object):
@@ -690,7 +692,12 @@ class ObservableTest(TestCase):
         class MyObserver(Observable):
             def __init__(self):
                 Observable.__init__(self)
-                self.generatorReturningCallable = partial(lambda arg: (x for x in 'a'), arg='partialed')
+                #self.generatorReturningCallable = partial(lambda arg: (x for x in 'a'), arg='partialed')
+
+            def acallable(self):
+                return (x for x in 'a')
+
+            generatorReturningCallable = acallable
 
             def noGeneratorFunction(self):
                 callLog.append('function called')
@@ -981,35 +988,6 @@ class ObservableTest(TestCase):
             self.assertEquals(functionName, tb.tb_frame.f_code.co_name)
             tb = tb.tb_next
         self.assertEquals(None, tb, format_tb(tb))
-
-    def get_tracked_objects(self):
-        return [o for o in gc.get_objects() if type(o) in 
-                (compose, GeneratorType, Exception,
-                    AllMessage, AnyMessage, DoMessage, OnceMessage)]
- 
-    def setUp(self):
-        gc.collect()
-        self._baseline = self.get_tracked_objects()
-
-    def tearDown(self):
-        def tostr(o):
-            if isframe(o):
-                return getframeinfo(o)
-            try:
-                return tostring(o)
-            except:
-                return repr(o)
-        gc.collect()
-        diff = set(self.get_tracked_objects()) - set(self._baseline)
-        self.assertEquals(set(), diff)
-        for obj in diff:
-            print "Leak:"
-            print tostr(obj)
-            print "Referrers:"
-            for o in gc.get_referrers(obj):
-                print tostr(o)
-        del self._baseline
-        gc.collect()
 
 
 class Responder(Observable):
