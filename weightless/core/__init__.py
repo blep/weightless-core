@@ -28,7 +28,9 @@ VERSION='$Version: x.y.z$'[9:-1].strip() # Modified by package scripts
 from os.path import dirname, abspath, isdir, join            #DO_NOT_DISTRIBUTE
 from sys import version_info                                 #DO_NOT_DISTRIBUTE
 pycmd = "python%s.%s" % version_info[:2]                     #DO_NOT_DISTRIBUTE
-if isdir(join(abspath(dirname(__file__)), '.svn')):          #DO_NOT_DISTRIBUTE
+mydir = dirname(abspath(__file__))                           #DO_NOT_DISTRIBUTE
+projectdir = dirname(dirname(mydir))                         #DO_NOT_DISTRIBUTE
+if isdir(join(projectdir, '.git')):                          #DO_NOT_DISTRIBUTE
     from os import system                                    #DO_NOT_DISTRIBUTE
     status = system(                                         #DO_NOT_DISTRIBUTE
         "cd %s/../..; %s setup.py build_ext --inplace"       #DO_NOT_DISTRIBUTE
